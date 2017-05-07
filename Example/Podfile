@@ -1,0 +1,13 @@
+source 'https://github.com/CocoaPods/Specs.git'
+
+platform :ios, '7.0'
+
+workspace 'MLHttpDNSDemo.xcworkspace'
+
+target 'MLHttpDNSDemo' do
+	project 'MLHttpDNSDemo.xcodeproj'
+    
+    pod 'AFNetworking'
+    pod 'YYCache'
+
+end
