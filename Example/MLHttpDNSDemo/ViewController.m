@@ -21,7 +21,6 @@
     [super viewDidLoad];
     // Do any additional setup after loading the view, typically from a nib.
     [MLHttpDNS sharedInstance].enableLog = YES;
-    [MLHttpDNS sharedInstance].ttl = 5;
     [[MLHttpDNS sharedInstance] setQueryIPsWithRemoteDNSBlock:^(NSString *host,void (^completion)(NSSet *ips)) {
         static AFHTTPSessionManager *manager;
         static dispatch_once_t onceToken;
@@ -48,16 +47,10 @@
     }];
 }
 
-
-- (void)didReceiveMemoryWarning {
-    [super didReceiveMemoryWarning];
-    // Dispose of any resources that can be recreated.
-}
-
 - (IBAction)clickQueryIPsWithLocalDNS:(id)sender {
     struct timeval t0;
     gettimeofday(&t0, NULL);
-    [[MLHttpDNS sharedInstance]queryIPFromHost:@"diufan.com" completion:^(NSString *ip) {
+    [[MLHttpDNS sharedInstance]queryIPFromHost:@"diufan.com" nilWithHTTPProxy:YES completion:^(NSString *ip) {
         struct timeval t1;
         gettimeofday(&t1, NULL);
         double ms = (double)(t1.tv_sec - t0.tv_sec) * 1e3 + (double)(t1.tv_usec - t0.tv_usec) * 1e-3;
