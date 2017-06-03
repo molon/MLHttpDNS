@@ -7,7 +7,6 @@ workspace 'MLHttpDNSDemo.xcworkspace'
 target 'MLHttpDNSDemo' do
 	project 'MLHttpDNSDemo.xcodeproj'
     
-    pod 'AFNetworking'
-    pod 'YYCache'
+    pod 'MLHttpDNS', :path => '../MLHttpDNS.podspec'
 
 end

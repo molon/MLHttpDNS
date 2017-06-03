@@ -21,12 +21,18 @@
 @property (nonatomic, assign) NSTimeInterval expireTime;
 
 /*!
- @brief 每隔主机名有效记录的遗弃时间，默认60*5
+ @brief 每个主机名有效记录的遗弃时间，默认60*3
  */
 @property (nonatomic, assign) NSTimeInterval banTime;
 
 /*!
- @brief 是否开启日志
+ @brief 永远懒请求远程DNS服务器，默认为YES
+ @warning 若为YES能保证尽可能的不受RemoteDNS服务的可用性影响，弊端是会有短暂的一两次被劫持可能，若为NO则不会有上述弊端，但是需要去RemoteDNS请求时会等待其返回或者超时才有响应，很受服务的可用性速度等限制。
+ */
+@property (nonatomic, assign) BOOL alwaysLazyQueryFromRemoteDNS;
+
+/*!
+ @brief 是否开启日志，默认为NO
  */
 @property (nonatomic, assign) BOOL enableLog;
 

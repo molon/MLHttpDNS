@@ -22,11 +22,11 @@
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                         <subviews>
                             <button opaque="NO" contentMode="scaleToFill" fixedFrame="YES" contentHorizontalAlignment="center" contentVerticalAlignment="center" buttonType="roundedRect" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="myk-Do-gzt">
-                                <rect key="frame" x="106" y="318" width="163" height="30"/>
+                                <rect key="frame" x="96" y="318" width="182" height="30"/>
                                 <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
-                                <state key="normal" title="QueryIPsWithLocalDNS"/>
+                                <state key="normal" title="QueryIPsWithMLHttpDNS"/>
                                 <connections>
-                                    <action selector="clickQueryIPsWithLocalDNS:" destination="BYZ-38-t0r" eventType="touchUpInside" id="4Vk-hp-s6X"/>
+                                    <action selector="clickQueryIPsWithMLHttpDNS:" destination="BYZ-38-t0r" eventType="touchUpInside" id="d0O-fv-5A7"/>
                                 </connections>
                             </button>
                         </subviews>

@@ -27,7 +27,6 @@ _Pragma("clang diagnostic pop"); \
 
 @property (nonatomic, assign) NSTimeInterval time;
 @property (nonatomic, strong) NSSet *ips;
-@property (nonatomic, assign) NSTimeInterval ttl; //过期时间
 
 @end
 
@@ -61,9 +60,9 @@ _Pragma("clang diagnostic pop"); \
     return self;
 }
 
-- (BOOL)isExpire {
+- (BOOL)isStaleWithTTL:(NSTimeInterval)ttl {
     NSTimeInterval time = [[NSDate date]timeIntervalSince1970];
-    return (time-_time>_ttl);
+    return (time-_time>ttl);
 }
 
 @end
@@ -76,9 +75,11 @@ _Pragma("clang diagnostic pop"); \
     pthread_mutex_t _m; //recursive
 }
 
-@synthesize ttl = _ttl;
+@synthesize expireTime = _expireTime;
+@synthesize banTime = _banTime;
 @synthesize enableLog = _enableLog;
 @synthesize queryIPsWithRemoteDNSBlock = _queryIPsWithRemoteDNSBlock;
+@synthesize alwaysLazyQueryFromRemoteDNS = _alwaysLazyQueryFromRemoteDNS;
 
 + (instancetype)sharedInstance {
     static id _sharedInstance = nil;
@@ -94,7 +95,10 @@ _Pragma("clang diagnostic pop"); \
 - (instancetype)init {
     self = [super init];
     if (self) {
-        _ttl = 50;
+        _expireTime = 50;
+        _banTime = 60*3;
+        _alwaysLazyQueryFromRemoteDNS = YES;
+        _enableLog = NO;
         
         //mutex
         pthread_mutexattr_t attr;
@@ -117,9 +121,15 @@ _Pragma("clang diagnostic pop"); \
 }
 
 #pragma mark - setter
-- (void)setTtl:(NSTimeInterval)ttl {
+- (void)setExpireTime:(NSTimeInterval)expireTime {
     [self lock];
-    _ttl = ttl;
+    _expireTime = expireTime;
+    [self unlock];
+}
+
+- (void)setBanTime:(NSTimeInterval)banTime {
+    [self lock];
+    _banTime = banTime;
     [self unlock];
 }
 
@@ -135,13 +145,25 @@ _Pragma("clang diagnostic pop"); \
     [self unlock];
 }
 
-#pragma mark - getter
-
-- (NSTimeInterval)ttl {
+- (void)setAlwaysLazyQueryFromRemoteDNS:(BOOL)alwaysLazyQueryFromRemoteDNS {
     [self lock];
-    NSTimeInterval ttl = _ttl;
+    _alwaysLazyQueryFromRemoteDNS = alwaysLazyQueryFromRemoteDNS;
     [self unlock];
-    return ttl;
+}
+
+#pragma mark - getter
+- (NSTimeInterval)expireTime {
+    [self lock];
+    NSTimeInterval expireTime = _expireTime;
+    [self unlock];
+    return expireTime;
+}
+
+- (NSTimeInterval)banTime {
+    [self lock];
+    NSTimeInterval banTime = _banTime;
+    [self unlock];
+    return banTime;
 }
 
 - (BOOL)enableLog {
@@ -156,6 +178,13 @@ _Pragma("clang diagnostic pop"); \
     typeof(_queryIPsWithRemoteDNSBlock) queryBlock = _queryIPsWithRemoteDNSBlock;
     [self unlock];
     return queryBlock;
+}
+
+- (BOOL)alwaysLazyQueryFromRemoteDNS {
+    [self lock];
+    BOOL alwaysLazyQueryFromRemoteDNS = _alwaysLazyQueryFromRemoteDNS;
+    [self unlock];
+    return alwaysLazyQueryFromRemoteDNS;
 }
 
 #pragma mark - mutex
@@ -174,10 +203,17 @@ _Pragma("clang diagnostic pop"); \
     
     host = [host lowercaseString];
     
+    __block BOOL ended = NO;
     void(^endBlock)(NSString *ip) = ^(NSString *ip){
+        if (ended) {
+            return;
+        }
+        ended = YES;
+        
         if (self.enableLog) {
             NSLog(@"[MLHttpDNS] Return IP for %@:%@",host,ip);
         }
+        
         //最后回到主线程返回
         dispatch_async(dispatch_get_main_queue(), ^{
             completion(ip);
@@ -195,7 +231,7 @@ _Pragma("clang diagnostic pop"); \
         _MLHttpDNSRecord *r = nil;
         if ([object isKindOfClass:[_MLHttpDNSRecord class]]) {
             r = (_MLHttpDNSRecord*)object;
-            if (![r isExpire]) {
+            if (![r isStaleWithTTL:self.expireTime]) {
                 endBlock([r.ips anyObject]);
                 return;
             }
@@ -208,11 +244,10 @@ _Pragma("clang diagnostic pop"); \
             }else{
                 _MLHttpDNSRecord *record = [_MLHttpDNSRecord new];
                 record.ips = ips;
-                record.ttl = _ttl;
                 [_cache setObject:record forKey:host];
             }
             if (_enableLog) {
-                NSLog(@"[MLHttpDNS] Cache IPs For %@ (ttl:%.0f):\n%@",host,_ttl,ips);
+                NSLog(@"[MLHttpDNS] Cache IPs For %@ (ttl:%.0lf):\n%@",host,_expireTime,ips);
             }
             [self unlock];
         };
@@ -221,9 +256,11 @@ _Pragma("clang diagnostic pop"); \
         if (self.enableLog) {
             NSLog(@"[MLHttpDNS] Begin query IPs with local dns for %@",host);
         }
+        
         [self queryIPsWithLocalDNSFromHost:host completion:^(NSSet *localIPs) {
+            [self lock];
+            
             NSMutableSet *validIPs = [NSMutableSet setWithCapacity:localIPs.count];
-#warning 是否需要异步线程来做，如果上面是主线程的话
             //和历史绝对有效记录比对，剔除无效的
             for (NSString *ip in localIPs) {
                 if ([_historyCache containsObjectForKey:[self historyCacheKeyWithHost:host ip:ip]]) {
@@ -231,27 +268,38 @@ _Pragma("clang diagnostic pop"); \
                 }
             }
             
-            if (self.enableLog) {
+            if (_enableLog) {
                 NSLog(@"[MLHttpDNS] Get %ld IPs from local dns for %@, validIPs count:%ld",localIPs.count,host,validIPs.count);
             }
-#warning
-            if (validIPs.count<=0) {
+            
+            //说明至少LocalDNS返回的一些IP曾经被验证过可用，这里直接认为有效返回即可。
+            if (validIPs.count>0) {
+                [self unlock];
+                
                 //存储下来
                 cacheCurrentRecord(validIPs);
                 endBlock([validIPs anyObject]);
                 return;
             }
             
-            //到这里可以就先认作是被劫持了，(也不一定，有可能历史有效记录并未记录所有域名，这很正常，但是不影响下面的逻辑)
-            //如果有过期还未遗弃的缓存，就直接返回过期缓存，保证请求的正常快速执行，下面第三方服务去尽可能的异步更新缓存，即使第三方服务后续一直挂了，就会触发下一个行为
-            //如果并未存在过期还未遗弃的缓存，第三方服务又挂了的话，就直接返回nil，让其按原始行为请求吧，管不了了，等第三方服务又有效的时候，自然而然就动起来了。
+            //到这里可以就先认作是被劫持了，(也不一定，有可能历史有效记录并未记录所有域名，这很正常，但是不影响下面的逻辑，其记录一次后即可正常)
+            //如果有过期还未遗弃的缓存，就直接返回过期缓存，保证请求的正常快速执行，下面第三方服务去尽可能的异步更新缓存，即使第三方服务后续一直挂了，也会触发下一个行为
+            if (r&&![r isStaleWithTTL:_banTime]) {
+                endBlock([r.ips anyObject]);
+            }else{
+                //若打开了此开关，那就先返回本地DNS获取的那些用着，这会的话有丢丢可能让用户遇到被劫持情况，但是只要远程DNS可用，用户重新请求就可恢复正常
+                if (_alwaysLazyQueryFromRemoteDNS) {
+                    endBlock([localIPs anyObject]);
+                }
+            }
             
-#warning 还未处理完毕
-            
-            //没有有效的就去RemoteDNS请求，结果集记录并返回
-            if (self.enableLog) {
+            //如果并未存在过期还未遗弃的缓存，RemoteDNS又挂了的话，最后会直接返回nil让外界按原始行为请求，管不了了，等第三方服务又有效的时候，自然而然就动起来了。
+            if (_enableLog) {
                 NSLog(@"[MLHttpDNS] Begin query IPs with remote dns for %@",host);
             }
+            
+            [self unlock];
+            
             [self queryIPsWithRemoteDNSFromHost:host completion:^(NSSet *remoteIPs) {
                 //将这些IP作为历史绝对有效记录来看
                 for (NSString *ip in remoteIPs) {

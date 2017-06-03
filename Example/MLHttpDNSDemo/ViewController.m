@@ -47,7 +47,7 @@
     }];
 }
 
-- (IBAction)clickQueryIPsWithLocalDNS:(id)sender {
+- (IBAction)clickQueryIPsWithMLHttpDNS:(id)sender {
     struct timeval t0;
     gettimeofday(&t0, NULL);
     [[MLHttpDNS sharedInstance]queryIPFromHost:@"diufan.com" nilWithHTTPProxy:YES completion:^(NSString *ip) {
