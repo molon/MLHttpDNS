@@ -21,6 +21,7 @@
     [super viewDidLoad];
     // Do any additional setup after loading the view, typically from a nib.
     [MLHttpDNS sharedInstance].enableLog = YES;
+    [MLHttpDNS sharedInstance].expireTime = 5; //测试用
     [[MLHttpDNS sharedInstance] setQueryIPsWithRemoteDNSBlock:^(NSString *host,void (^completion)(NSSet *ips)) {
         static AFHTTPSessionManager *manager;
         static dispatch_once_t onceToken;

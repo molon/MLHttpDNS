@@ -8,8 +8,8 @@
 
 #import "MLHttpDNS.h"
 #import <arpa/inet.h>
-#import <YYCache.h>
-#import <AFNetworkReachabilityManager.h>
+#import <YYCache/YYCache.h>
+#import <AFNetworking/AFNetworkReachabilityManager.h>
 #import <pthread.h>
 
 NSString * const MLHttpDNSCacheName = @"MLHttpDNSCache";
@@ -269,7 +269,7 @@ _Pragma("clang diagnostic pop"); \
             }
             
             if (_enableLog) {
-                NSLog(@"[MLHttpDNS] Get %ld IPs from local dns for %@, validIPs count:%ld",localIPs.count,host,validIPs.count);
+                NSLog(@"[MLHttpDNS] Get %lu IPs from local dns for %@, validIPs count:%lu",(unsigned long)localIPs.count,host,(unsigned long)validIPs.count);
             }
             
             //说明至少LocalDNS返回的一些IP曾经被验证过可用，这里直接认为有效返回即可。
@@ -307,7 +307,7 @@ _Pragma("clang diagnostic pop"); \
                 }
                 
                 if (self.enableLog) {
-                    NSLog(@"[MLHttpDNS] Get %ld IPs from remote dns for %@",remoteIPs.count,host);
+                    NSLog(@"[MLHttpDNS] Get %lu IPs from remote dns for %@",(unsigned long)remoteIPs.count,host);
                 }
                 
                 cacheCurrentRecord(remoteIPs);
@@ -326,7 +326,7 @@ _Pragma("clang diagnostic pop"); \
 void _MLHttpDNS_CFHostClientCallbackFunction(CFHostRef theHost, CFHostInfoType typeInfo, const CFStreamError *error, void *info) {
     void(^endBlock)(NSSet *) = ^(NSSet *ips){
         if (error!=NULL&&(error->domain!=0||error->error!=0)) {
-            NSLog(@"Error while `_MLHttpDNS_CFHostClientCallbackFunction`: %d (domain:%ld)",error->error,error->domain);
+            NSLog(@"Error while `_MLHttpDNS_CFHostClientCallbackFunction`: %d (domain:%ld)",(int)error->error,(long)error->domain);
         }
         
         void(^completion)(NSSet *) = (__bridge typeof(completion))info;
@@ -401,7 +401,7 @@ void _MLHttpDNS_CFHostClientCallbackFunction(CFHostRef theHost, CFHostInfoType t
     CFStreamError error;
     ret = CFHostStartInfoResolution(hostRef, kCFHostAddresses, &error);
     if (!ret) {
-        NSLog(@"Error while `CFHostStartInfoResolution`: %d (domain:%ld)",error.error,error.domain);
+        NSLog(@"Error while `CFHostStartInfoResolution`: %d (domain:%ld)",(int)error.error,(long)error.domain);
         
         CFHostUnscheduleFromRunLoop(hostRef, CFRunLoopGetMain(), kCFRunLoopCommonModes);
         CFHostSetClient(hostRef, NULL, NULL);
