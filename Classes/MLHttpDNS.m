@@ -227,6 +227,7 @@ _Pragma("clang diagnostic pop"); \
     }
     
     //首先判断当前是否已经存在没过期的结果了，有就无需进行query
+#warning 这里返回的ip是 anyObject 比较戳比。因为可能设备的不同IP应该选取不同的服务IP来对应。_alwaysLazyQueryFromRemoteDNS应该设置为默认就是YES且不可修改会比较好
     [_cache objectForKey:host withBlock:^(NSString * _Nonnull key, id _Nonnull object) {
         _MLHttpDNSRecord *r = nil;
         if ([object isKindOfClass:[_MLHttpDNSRecord class]]) {
@@ -283,7 +284,7 @@ _Pragma("clang diagnostic pop"); \
             }
             
             //到这里可以就先认作是被劫持了，(也不一定，有可能历史有效记录并未记录所有域名，这很正常，但是不影响下面的逻辑，其记录一次后即可正常)
-            //如果有过期还未遗弃的缓存，就直接返回过期缓存，保证请求的正常快速执行，下面第三方服务去尽可能的异步更新缓存，即使第三方服务后续一直挂了，也会触发下一个行为
+            //如果有过期还未遗弃的缓存，就直接返回过期缓存，保证请求的正常快速执行，下面第三方服务去尽可能的异步更新缓存，即使第三方服务后续一直挂了，也可保证业务能继续进行
             if (r&&![r isStaleWithTTL:_banTime]) {
                 endBlock([r.ips anyObject]);
             }else{
